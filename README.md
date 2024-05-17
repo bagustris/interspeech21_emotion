@@ -39,10 +39,10 @@ Or refer to <https://github.com/libsndfile/libsndfile>.
 bash extract_wavs.sh /path_to_your_IEMOCAP_full_release
 ```
 
-3. Replace the '/path_to_wavs' text in ./iemocap/\*.csv, with the actual path just saved all the wav files. You can use the following command.
+3. Replace the '/path_to_wavs' text in ./iemocap/\*.csv, with the actual path just saved all the wav files. You can use the following command. If you make directory like me, i.e., saving all iemocap audio files under /data/IEMOCAP_full_release/wav_path_16k/ you can skip this step.
 
 ```bash
-for f in iemocap/*.csv; do sed -i 's|/path_to_wavs/|/data/IEMOCAP_full_release/wav_path_16k/|g' $f; done
+for f in iemocap/*.csv; do sed -i 's|/data/IEMOCAP_full_release/wav_path_16k/|/your_path_to_wav_16k/|g' $f; done
 ```
 
 Note: The iemocap/*.csv has 20 files, corresponding to the data split into 10 folds, according to session ID (01F, 01M, ..., 05F, 05M). For each fold, use the other 9 sessions as training, and test on the selected session. For example, for the fold 01F, we use 01F as test set and remaining 9 sessions as training set. Two csv files for each fold, one for training and one for testing. The names are: iemocap_01F.train.csv and iemocap_01F.test.csv. The csv file has 3 columns: file, emotion, text. The column 'file' indicates where to store the wav file; the column 'emotion' is the emotion label (we use 4 labels: e0, e1, e2, e3); the column 'text' is for transcript. For example:
@@ -64,9 +64,9 @@ This will run the code and generates results in output/tmp/ folder, while cache 
 The model = wav2vec2-base, alpha = 0.1, LR = 5e-5, effective batch size = 8, total train epochs = 200.
 The 01F split will be used as testing and remaining will be used as training.
 
-NOTE: At around 40 epochs, the eval acc should already reaches a fairly good results. But due to the learning rate at this time is still high, there will be fluctuations. Nevertheless, verifying or early stopping could save time and get a reasonable good model.
+NOTE: At around 40 epochs, the eval acc should already reaches fairly good results. But due to the learning rate at this time is still high, there will be fluctuations. Nevertheless, verifying or early stopping could save time and get a reasonable good model.
 
-WARNING: If running on 1 single GPU, 200 epochs will take days to finish. To speed up, consider using multiple GPUs. By default, the code use all GPUs in the system.
+WARNING: If running on 1 single GPU RTX-3090 (24GB VRAM), 200 epochs will take TODO:XX days to finish. To speed up, consider using multiple GPUs. By default, the code uses all GPUs in the system.
 
 ## For inference
 
@@ -77,7 +77,7 @@ bash prediction.sh output/tmp
 ```
 
 This will generate a classification result, for the 01F_test split, in output/predictions/tmp. Details can be found in the script.
-NOTE: If you want to use your own inference data (prepared in a csv file), please modify the load_dataset() part in run_emotion.py.
+NOTE: If you want to use your own inference data (prepared in a CSV file), please modify the load_dataset() part in run_emotion.py.
 
 ## Reproduce using checkpoints
 

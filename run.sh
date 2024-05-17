@@ -3,7 +3,7 @@ export TOKENIZER=wav2vec2-base
 export ALPHA=0.1
 export LR=5e-5
 export ACC=4 # batch size * acc = 8
-export WORKER_NUM=4
+export WORKER_NUM=10
 
 python run_emotion.py \
 --output_dir=output/tmp \

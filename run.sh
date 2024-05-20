@@ -5,7 +5,7 @@ export LR=5e-5
 export ACC=4 # batch size * acc = 8
 export WORKER_NUM=10
 
-python run_emotion.py \
+CUDA_VISIBLE_DEVICES=0 python run_emotion.py \
 --output_dir=output/tmp \
 --cache_dir=cache/ \
 --num_train_epochs=200 \

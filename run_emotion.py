@@ -51,11 +51,13 @@ class ModelArguments:
     """
 
     model_name_or_path: str = field(
-        metadata={"help": "Path to pretrained model or model identifier from huggingface.co/models"}
+        metadata={
+            "help": "Path to pretrained model or model identifier from huggingface.co/models"}
     )
     cache_dir: Optional[str] = field(
         default=None,
-        metadata={"help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
+        metadata={
+            "help": "Where do you want to store the pretrained models downloaded from huggingface.co"},
     )
     freeze_feature_extractor: Optional[bool] = field(
         default=False, metadata={"help": "Whether to freeze the feature extractor layers of the model."}
@@ -118,19 +120,23 @@ class DataTrainingArguments:
     )
     target_text_column: Optional[str] = field(
         default="text",
-        metadata={"help": "Column in the dataset that contains label (target text). Defaults to 'text'"},
+        metadata={
+            "help": "Column in the dataset that contains label (target text). Defaults to 'text'"},
     )
     speech_file_column: Optional[str] = field(
         default="file",
-        metadata={"help": "Column in the dataset that contains speech file path. Defaults to 'file'"},
+        metadata={
+            "help": "Column in the dataset that contains speech file path. Defaults to 'file'"},
     )
     target_feature_extractor_sampling_rate: Optional[bool] = field(
         default=False,
-        metadata={"help": "Resample loaded audio to target feature extractor's sampling rate or not."},
+        metadata={
+            "help": "Resample loaded audio to target feature extractor's sampling rate or not."},
     )
     max_duration_in_seconds: Optional[float] = field(
         default=None,
-        metadata={"help": "Filters out examples longer than specified. Defaults to no filtering."},
+        metadata={
+            "help": "Filters out examples longer than specified. Defaults to no filtering."},
     )
     orthography: Optional[str] = field(
         default="librispeech",
@@ -201,10 +207,12 @@ class Orthography:
                 "^": "v",  # fixing "tha" in arabic_speech_corpus dataset
             }
             return cls(
-                vocab_file=pathlib.Path(__file__).parent.joinpath("vocab/buckwalter.json"),
+                vocab_file=pathlib.Path(__file__).parent.joinpath(
+                    "vocab/buckwalter.json"),
                 word_delimiter_token="/",  # "|" is Arabic letter alef with madda above
                 translation_table=str.maketrans(translation_table),
-                words_to_remove={"sil"},  # fixing "sil" in arabic_speech_corpus dataset
+                # fixing "sil" in arabic_speech_corpus dataset
+                words_to_remove={"sil"},
                 untransliterator=arabic.buckwalter.untransliterate,
             )
         raise ValueError(f"Unsupported orthography: '{name}'.")
@@ -219,7 +227,9 @@ class Orthography:
             except:
                 text = "NULL"
         else:
-            text = " ".join(w for w in text.split() if w not in self.words_to_remove)  # and clean up whilespaces
+            # and clean up whilespaces
+            text = " ".join(w for w in text.split()
+                            if w not in self.words_to_remove)
         return text
 
     def create_processor(self, model_args: ModelArguments) -> Wav2Vec2Processor:
@@ -280,9 +290,11 @@ class DataCollatorCTCWithPadding:
     def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
         # split inputs and labels since they have to be of different lenghts and need
         # different padding methods
-        input_features = [{"input_values": feature["input_values"]} for feature in features]
+        input_features = [{"input_values": feature["input_values"]}
+                          for feature in features]
         if self.audio_only is False:
-            label_features = [{"input_ids": feature["labels"][:-1]} for feature in features]
+            label_features = [{"input_ids": feature["labels"][:-1]}
+                              for feature in features]
             cls_labels = [feature["labels"][-1] for feature in features]
 
         batch = self.processor.pad(
@@ -303,8 +315,10 @@ class DataCollatorCTCWithPadding:
                 )
 
             # replace padding with -100 to ignore loss correctly
-            ctc_labels = labels_batch["input_ids"].masked_fill(labels_batch.attention_mask.ne(1), -100)
-            batch["labels"] = (ctc_labels, torch.tensor(cls_labels)) # labels = (ctc_labels, cls_labels)
+            ctc_labels = labels_batch["input_ids"].masked_fill(
+                labels_batch.attention_mask.ne(1), -100)
+            # labels = (ctc_labels, cls_labels)
+            batch["labels"] = (ctc_labels, torch.tensor(cls_labels))
 
         return batch
 
@@ -315,14 +329,16 @@ class CTCTrainer(Trainer):
             if isinstance(v, torch.Tensor):
                 kwargs = dict(device=self.args.device)
                 if self.deepspeed and inputs[k].dtype != torch.int64:
-                    kwargs.update(dict(dtype=self.args.hf_deepspeed_config.dtype()))
+                    kwargs.update(
+                        dict(dtype=self.args.hf_deepspeed_config.dtype()))
                 inputs[k] = v.to(**kwargs)
 
-            if k == 'labels': # labels are list of tensor, not tensor, special handle here
+            if k == 'labels':  # labels are list of tensor, not tensor, special handle here
                 for i in range(len(inputs[k])):
                     kwargs = dict(device=self.args.device)
                     if self.deepspeed and inputs[k][i].dtype != torch.int64:
-                        kwargs.update(dict(dtype=self.args.hf_deepspeed_config.dtype()))
+                        kwargs.update(
+                            dict(dtype=self.args.hf_deepspeed_config.dtype()))
                     inputs[k][i] = inputs[k][i].to(**kwargs)
 
         if self.args.past_index >= 0 and self._past is not None:
@@ -382,7 +398,8 @@ def main():
     # or by passing the --help flag to this script.
     # We now keep distinct sets of args, for a cleaner separation of concerns.
 
-    parser = HfArgumentParser((ModelArguments, DataTrainingArguments, TrainingArguments))
+    parser = HfArgumentParser(
+        (ModelArguments, DataTrainingArguments, TrainingArguments))
 
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     configure_logger(model_args, training_args)
@@ -407,71 +424,87 @@ def main():
     processor = orthography.create_processor(model_args)
 
     if data_args.dataset_name == 'emotion':
-        train_dataset = datasets.load_dataset('csv', data_files='iemocap/iemocap_' + data_args.split_id + '.train.csv', cache_dir=model_args.cache_dir)['train']
-        val_dataset = datasets.load_dataset('csv', data_files='iemocap/iemocap_' + data_args.split_id + '.test.csv', cache_dir=model_args.cache_dir)['train']
-        cls_label_map = {"e0":0, "e1":1, "e2":2, "e3":3}
+        train_dataset = datasets.load_dataset(
+            'csv', data_files='iemocap/iemocap_' + data_args.split_id + '.train.csv', cache_dir=model_args.cache_dir)['train']
+        val_dataset = datasets.load_dataset(
+            'csv', data_files='iemocap/iemocap_' + data_args.split_id + '.test.csv', cache_dir=model_args.cache_dir)['train']
+        cls_label_map = {"e0": 0, "e1": 1, "e2": 2, "e3": 3}
 
     model = Wav2Vec2ForCTCnCLS.from_pretrained(
         model_args.model_name_or_path,
         cache_dir=model_args.cache_dir,
-        gradient_checkpointing=True, # training_args.gradient_checkpointing,
+        gradient_checkpointing=True,  # training_args.gradient_checkpointing,
         vocab_size=len(processor.tokenizer),
         cls_len=len(cls_label_map),
         alpha=model_args.alpha,
     )
- 
+
     wer_metric = datasets.load_metric("wer")
     target_sr = processor.feature_extractor.sampling_rate if data_args.target_feature_extractor_sampling_rate else None
-    vocabulary_chars_str = "".join(t for t in processor.tokenizer.get_vocab().keys() if len(t) == 1)
+    vocabulary_chars_str = "".join(
+        t for t in processor.tokenizer.get_vocab().keys() if len(t) == 1)
     vocabulary_text_cleaner = re.compile(  # remove characters not in vocabulary
-        f"[^\s{re.escape(vocabulary_chars_str)}]",  # allow space in addition to chars in vocabulary
+        # allow space in addition to chars in vocabulary
+        f"[^\s{re.escape(vocabulary_chars_str)}]",
         flags=re.IGNORECASE if processor.tokenizer.do_lower_case else 0,
     )
     text_updates = []
 
-    def prepare_example(example, audio_only=False):  # TODO(elgeish) make use of multiprocessing?
-        example["speech"], example["sampling_rate"] = librosa.load(example[data_args.speech_file_column], sr=target_sr)
+    # TODO(elgeish) make use of multiprocessing?
+    def prepare_example(example, audio_only=False):
+        example["speech"], example["sampling_rate"] = librosa.load(
+            example[data_args.speech_file_column], sr=target_sr)
         if data_args.max_duration_in_seconds is not None:
-            example["duration_in_seconds"] = len(example["speech"]) / example["sampling_rate"]
+            example["duration_in_seconds"] = len(
+                example["speech"]) / example["sampling_rate"]
         if audio_only is False:
             # Normalize and clean up text; order matters!
-            updated_text = orthography.preprocess_for_training(example[data_args.target_text_column])
+            updated_text = orthography.preprocess_for_training(
+                example[data_args.target_text_column])
             updated_text = vocabulary_text_cleaner.sub("", updated_text)
             if updated_text != example[data_args.target_text_column]:
-                text_updates.append((example[data_args.target_text_column], updated_text))
+                text_updates.append(
+                    (example[data_args.target_text_column], updated_text))
                 example[data_args.target_text_column] = updated_text
         return example
 
     if training_args.do_train:
-        train_dataset = train_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
+        train_dataset = train_dataset.map(prepare_example, remove_columns=[
+                                          data_args.speech_file_column])
     if training_args.do_predict:
-        val_dataset = val_dataset.map(prepare_example, fn_kwargs={'audio_only':True})
+        val_dataset = val_dataset.map(
+            prepare_example, fn_kwargs={'audio_only': True})
     elif training_args.do_eval:
-        val_dataset = val_dataset.map(prepare_example, remove_columns=[data_args.speech_file_column])
+        val_dataset = val_dataset.map(prepare_example, removmape_columns=[
+                                      data_args.speech_file_column])
 
     if data_args.max_duration_in_seconds is not None:
         def filter_by_max_duration(example):
             return example["duration_in_seconds"] <= data_args.max_duration_in_seconds
         if training_args.do_train:
             old_train_size = len(train_dataset)
-            train_dataset = train_dataset.filter(filter_by_max_duration, remove_columns=["duration_in_seconds"])
+            train_dataset = train_dataset.filter(
+                filter_by_max_duration, remove_columns=["duration_in_seconds"])
             if len(train_dataset) > old_train_size:
                 logger.warning(
                     f"Filtered out {len(train_dataset) - old_train_size} train example(s) longer than {data_args.max_duration_in_seconds} second(s)."
                 )
         if training_args.do_predict or training_args.do_eval:
             old_val_size = len(val_dataset)
-            val_dataset = val_dataset.filter(filter_by_max_duration, remove_columns=["duration_in_seconds"])
+            val_dataset = val_dataset.filter(
+                filter_by_max_duration, remove_columns=["duration_in_seconds"])
             if len(val_dataset) > old_val_size:
                 logger.warning(
                     f"Filtered out {len(val_dataset) - old_val_size} validation example(s) longer than {data_args.max_duration_in_seconds} second(s)."
                 )
     # logger.info(f"Split sizes: {len(train_dataset)} train and {len(val_dataset)} validation.")
 
-    logger.warning(f"Updated {len(text_updates)} transcript(s) using '{data_args.orthography}' orthography rules.")
+    logger.warning(
+        f"Updated {len(text_updates)} transcript(s) using '{data_args.orthography}' orthography rules.")
     if logger.isEnabledFor(logging.DEBUG):
         for original_text, updated_text in text_updates:
-            logger.debug(f'Updated text: "{original_text}" -> "{updated_text}"')
+            logger.debug(
+                f'Updated text: "{original_text}" -> "{updated_text}"')
     text_updates = None
 
     def prepare_dataset(batch, audio_only=False):
@@ -479,29 +512,43 @@ def main():
         assert (
             len(set(batch["sampling_rate"])) == 1
         ), f"Make sure all inputs have the same sampling rate of {processor.feature_extractor.sampling_rate}."
-        batch["input_values"] = processor(batch["speech"], sampling_rate=batch["sampling_rate"][0]).input_values
+        batch["input_values"] = processor(
+            batch["speech"], sampling_rate=batch["sampling_rate"][0]).input_values
         if audio_only is False:
-            cls_labels = list(map(lambda e: cls_label_map[e], batch["emotion"]))
+            cls_labels = list(
+                map(lambda e: cls_label_map[e], batch["emotion"]))
             with processor.as_target_processor():
-                batch["labels"] = processor(batch[data_args.target_text_column]).input_ids
+                batch["labels"] = processor(
+                    batch[data_args.target_text_column]).input_ids
             for i in range(len(cls_labels)):
-                batch["labels"][i].append(cls_labels[i]) # batch["labels"] element has to be a single list
+                # batch["labels"] element has to be a single list
+                batch["labels"][i].append(cls_labels[i])
         return batch
 
     if training_args.do_train:
+        train_dataset = train_dataset.remove_columns(
+            [data_args.speech_file_column])
         train_dataset = train_dataset.map(
             prepare_dataset,
             batch_size=training_args.per_device_train_batch_size,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
+            # remove_columns=train_dataset.column_names,
+            with_indices=True,
+            # padding=True
         )
     if training_args.do_predict:
+        val_dataset = val_dataset.remove_columns(
+            [data_args.speech_file_column])
         val_dataset = val_dataset.map(
             prepare_dataset,
-            fn_kwargs={'audio_only':True},
+            fn_kwargs={'audio_only': True},
             batch_size=training_args.per_device_train_batch_size,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
+            # remove_columns=train_dataset.column_names,
+            with_indices=True,
+            # padding=True,
         )
     elif training_args.do_eval:
         val_dataset = val_dataset.map(
@@ -509,31 +556,40 @@ def main():
             batch_size=training_args.per_device_train_batch_size,
             batched=True,
             num_proc=data_args.preprocessing_num_workers,
+            remove_columns=train_dataset.column_names,
+            with_indices=True,
         )
 
-    data_collator = DataCollatorCTCWithPadding(processor=processor, padding=True)
+    data_collator = DataCollatorCTCWithPadding(
+        processor=processor, padding=True)
 
     def compute_metrics(pred):
         cls_pred_logits = pred.predictions[1]
         cls_pred_ids = np.argmax(cls_pred_logits, axis=-1)
         total = len(pred.label_ids[1])
-        correct = (cls_pred_ids == pred.label_ids[1]).sum().item() # label = (ctc_label, cls_label)
+        # label = (ctc_label, cls_label)
+        correct = (cls_pred_ids == pred.label_ids[1]).sum().item()
 
         ctc_pred_logits = pred.predictions[0]
         ctc_pred_ids = np.argmax(ctc_pred_logits, axis=-1)
-        pred.label_ids[0][pred.label_ids[0] == -100] = processor.tokenizer.pad_token_id
+        pred.label_ids[0][pred.label_ids[0] == -
+                          100] = processor.tokenizer.pad_token_id
         ctc_pred_str = processor.batch_decode(ctc_pred_ids)
         # we do not want to group tokens when computing the metrics
-        ctc_label_str = processor.batch_decode(pred.label_ids[0], group_tokens=False)
+        ctc_label_str = processor.batch_decode(
+            pred.label_ids[0], group_tokens=False)
         if logger.isEnabledFor(logging.DEBUG):
             for reference, predicted in zip(label_str, pred_str):
                 logger.debug(f'reference: "{reference}"')
                 logger.debug(f'predicted: "{predicted}"')
                 if orthography.untransliterator is not None:
-                    logger.debug(f'reference (untransliterated): "{orthography.untransliterator(reference)}"')
-                    logger.debug(f'predicted (untransliterated): "{orthography.untransliterator(predicted)}"')
+                    logger.debug(
+                        f'reference (untransliterated): "{orthography.untransliterator(reference)}"')
+                    logger.debug(
+                        f'predicted (untransliterated): "{orthography.untransliterator(predicted)}"')
 
-        wer = wer_metric.compute(predictions=ctc_pred_str, references=ctc_label_str)
+        wer = wer_metric.compute(
+            predictions=ctc_pred_str, references=ctc_label_str)
         return {"acc": correct/total, "wer": wer, "correct": correct, "total": total, "strlen": len(ctc_label_str)}
 
     if model_args.freeze_feature_extractor:
@@ -558,19 +614,21 @@ def main():
 
     if training_args.do_train:
         trainer.train(resume_from_checkpoint=checkpoint)
-        trainer.save_model() 
+        trainer.save_model()
 
     if training_args.do_predict:
         logger.info('******* Predict ********')
-        data_collator.audio_only=True
-        predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="predict")
+        data_collator.audio_only = True
+        predictions, labels, metrics = trainer.predict(
+            val_dataset, metric_key_prefix="predict")
         logits_ctc, logits_cls = predictions
         pred_ids = np.argmax(logits_cls, axis=-1)
         pred_probs = F.softmax(torch.from_numpy(logits_cls).float(), dim=-1)
         print(val_dataset)
         with open(data_args.output_file, 'w') as f:
             for i in range(len(pred_ids)):
-                f.write(val_dataset[i]['file'].split("/")[-1] + " " + str(len(val_dataset[i]['input_values'])/16000) + " ")
+                f.write(val_dataset[i]['file'].split(
+                    "/")[-1] + " " + str(len(val_dataset[i]['input_values'])/16000) + " ")
                 pred = pred_ids[i]
                 f.write(str(pred)+' ')
                 for j in range(4):
@@ -579,12 +637,14 @@ def main():
         f.close()
 
     elif training_args.do_eval:
-        predictions, labels, metrics = trainer.predict(val_dataset, metric_key_prefix="eval")
+        predictions, labels, metrics = trainer.predict(
+            val_dataset, metric_key_prefix="eval")
         logits_ctc, logits_cls = predictions
         pred_ids = np.argmax(logits_cls, axis=-1)
         correct = np.sum(pred_ids == labels[1])
         acc = correct / len(pred_ids)
         print('correct:', correct, ', acc:', acc)
+
 
 if __name__ == "__main__":
     main()
